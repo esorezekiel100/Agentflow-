@@ -11,7 +11,6 @@ const navItems = [
   { to: '/tracker', label: 'Tracker' },
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/agent', label: 'Agent' },
-  { to: '/admin', label: 'Admin' },
 ]
 
 function BrandMark() {
@@ -41,6 +40,10 @@ function Layout({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
 
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+  }
+
   useEffect(() => {
     setMenuOpen(false)
   }, [location.pathname])
@@ -49,7 +52,7 @@ function Layout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-[#f7f6f2] text-[#182334]">
       <header className="sticky top-0 z-50 border-b border-[#e5e7e2] bg-[#fbfaf7]/95 shadow-[0_6px_20px_-18px_rgba(27,42,58,0.3)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-          <Link to="/" className="flex items-center gap-3 text-lg font-semibold tracking-wide text-[#182334]">
+          <Link to="/" onClick={scrollToTop} className="flex items-center gap-3 text-lg font-semibold tracking-wide text-[#182334]">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-emerald-400 shadow-lg shadow-indigo-500/30 ring-1 ring-white/10">
               <BrandMark />
             </span>
@@ -61,6 +64,7 @@ function Layout({ children }: { children: ReactNode }) {
               <NavLink
                 key={item.to}
                 to={item.to}
+                onClick={scrollToTop}
                 className={({ isActive }) =>
                   cn(
                     'rounded-full px-3.5 py-2 text-sm font-medium transition-all duration-200',
@@ -79,10 +83,10 @@ function Layout({ children }: { children: ReactNode }) {
             <button className="hidden rounded-full border border-[#e1e5e0] bg-white p-2.5 text-[#526172] transition hover:bg-[#f2f5f1] sm:inline-flex" aria-label="Notifications">
               <Bell className="h-4 w-4" />
             </button>
-            <Link to="/auth" className="hidden items-center gap-2 rounded-full border border-[#d6e2d9] bg-white px-4 py-2 text-sm font-semibold text-[#315e4b] transition hover:border-[#9bb7a7] hover:bg-[#f3f7f3] sm:inline-flex">
+            <Link to="/auth" onClick={scrollToTop} className="hidden items-center gap-2 rounded-full border border-[#d6e2d9] bg-white px-4 py-2 text-sm font-semibold text-[#315e4b] transition hover:border-[#9bb7a7] hover:bg-[#f3f7f3] sm:inline-flex">
               Sign in
             </Link>
-            <Link to="/opportunities" className="hidden items-center gap-2 rounded-full bg-[#1f493b] px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[#1f493b]/15 transition hover:bg-[#173c30] sm:inline-flex">
+            <Link to="/opportunities" onClick={scrollToTop} className="hidden items-center gap-2 rounded-full bg-[#1f493b] px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[#1f493b]/15 transition hover:bg-[#173c30] sm:inline-flex">
               <Search className="h-4 w-4" />
               Search
             </Link>
@@ -105,6 +109,7 @@ function Layout({ children }: { children: ReactNode }) {
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  onClick={scrollToTop}
                   end={item.to === '/'}
                   className={({ isActive }) =>
                     cn(
@@ -119,10 +124,10 @@ function Layout({ children }: { children: ReactNode }) {
                 </NavLink>
               ))}
               <div className="mt-2 grid grid-cols-2 gap-2 border-t border-[#e5e7e2] pt-3">
-                <Link to="/auth" className="rounded-xl border border-[#d6e2d9] bg-white px-4 py-3 text-center text-sm font-semibold text-[#315e4b] transition hover:bg-[#f3f7f3]">
+                <Link to="/auth" onClick={scrollToTop} className="rounded-xl border border-[#d6e2d9] bg-white px-4 py-3 text-center text-sm font-semibold text-[#315e4b] transition hover:bg-[#f3f7f3]">
                   Sign in
                 </Link>
-                <Link to="/opportunities" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1f493b] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#173c30]">
+                <Link to="/opportunities" onClick={scrollToTop} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1f493b] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#173c30]">
                   <Search className="h-4 w-4" />
                   Search
                 </Link>
@@ -148,25 +153,24 @@ function Layout({ children }: { children: ReactNode }) {
           <div>
             <h3 className="mb-3 font-semibold text-[#1d2c37]">Explore</h3>
             <ul className="space-y-2">
-              <li><Link to="/opportunities" className="hover:text-[#315e4b]">Browse opportunities</Link></li>
-              <li><Link to="/category/jobs" className="hover:text-[#315e4b]">Jobs</Link></li>
-              <li><Link to="/category/scholarships" className="hover:text-[#315e4b]">Scholarships</Link></li>
+              <li><Link to="/opportunities" onClick={scrollToTop} className="hover:text-[#315e4b]">Browse opportunities</Link></li>
+              <li><Link to="/category/jobs" onClick={scrollToTop} className="hover:text-[#315e4b]">Jobs</Link></li>
+              <li><Link to="/category/scholarships" onClick={scrollToTop} className="hover:text-[#315e4b]">Scholarships</Link></li>
             </ul>
           </div>
           <div>
             <h3 className="mb-3 font-semibold text-[#1d2c37]">Resources</h3>
             <ul className="space-y-2">
-              <li><Link to="/agent" className="hover:text-[#315e4b]">AI assistant</Link></li>
-              <li><Link to="/tracker" className="hover:text-[#315e4b]">Application tracker</Link></li>
-              <li><Link to="/dashboard" className="hover:text-[#315e4b]">Dashboard</Link></li>
+              <li><Link to="/agent" onClick={scrollToTop} className="hover:text-[#315e4b]">AI assistant</Link></li>
+              <li><Link to="/tracker" onClick={scrollToTop} className="hover:text-[#315e4b]">Application tracker</Link></li>
+              <li><Link to="/dashboard" onClick={scrollToTop} className="hover:text-[#315e4b]">Dashboard</Link></li>
             </ul>
           </div>
           <div>
             <h3 className="mb-3 font-semibold text-[#1d2c37]">Community</h3>
             <ul className="space-y-2">
-              <li><Link to="/submit-opportunity" className="hover:text-[#315e4b]">Submit opportunity</Link></li>
-              <li><Link to="/admin" className="hover:text-[#315e4b]">Moderation desk</Link></li>
-              <li><Link to="/agent" className="hover:text-[#315e4b]">Get weekly digest</Link></li>
+              <li><Link to="/submit-opportunity" onClick={scrollToTop} className="hover:text-[#315e4b]">Submit opportunity</Link></li>
+              <li><Link to="/agent" onClick={scrollToTop} className="hover:text-[#315e4b]">Get weekly digest</Link></li>
             </ul>
           </div>
         </div>

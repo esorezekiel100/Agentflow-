@@ -1,7 +1,7 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense, useEffect } from 'react'
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { AgentPage } from './pages/AgentPage'
-import { AdminPage } from './pages/AdminPage'
 import { AuthPage } from './pages/AuthPage'
 import { BrowsePage } from './pages/BrowsePage'
 import { DashboardPage } from './pages/DashboardPage'
@@ -13,9 +13,22 @@ import { ReportOpportunityPage } from './pages/ReportOpportunityPage'
 import { SubmitOpportunityPage } from './pages/SubmitOpportunityPage'
 import { TrackerPage } from './pages/TrackerPage'
 
+const AdminRoute = lazy(() => import('./pages/AdminRoute'))
+
+function ScrollToTop() {
+  const { pathname, search, hash, key } = useLocation()
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+  }, [hash, key, pathname, search])
+
+  return null
+}
+
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<Layout><HomePage /></Layout>} />
         <Route path="/auth" element={<Layout><AuthPage /></Layout>} />
@@ -24,7 +37,7 @@ function App() {
         <Route path="/tracker" element={<Layout><TrackerPage /></Layout>} />
         <Route path="/dashboard" element={<Layout><DashboardPage /></Layout>} />
         <Route path="/agent" element={<Layout><AgentPage /></Layout>} />
-        <Route path="/admin" element={<Layout><AdminPage /></Layout>} />
+        <Route path="/admin/*" element={<Suspense fallback={null}><AdminRoute /></Suspense>} />
         <Route path="/submit-opportunity" element={<Layout><SubmitOpportunityPage /></Layout>} />
         <Route path="/report/:slug" element={<Layout><ReportOpportunityPage /></Layout>} />
         <Route path="/opportunities" element={<Layout><BrowsePage /></Layout>} />

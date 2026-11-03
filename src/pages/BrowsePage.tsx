@@ -2,7 +2,8 @@ import { ArrowRight, Filter, Search, ShieldCheck, SlidersHorizontal } from 'luci
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { OpportunityCard } from '../components/OpportunityCard'
-import { categoryLabels, opportunityByCategory, opportunitySeed } from '../data/opportunities'
+import { categoryLabels } from '../data/opportunities'
+import { usePublishedOpportunities } from '../lib/opportunities'
 import { usePageMeta } from '../lib/seo'
 import type { Category, EducationLevel, FundingType, WorkMode } from '../types'
 
@@ -17,7 +18,6 @@ const categories: Array<{ value: Category | 'all'; label: string }> = [
   { value: 'empowerment', label: 'Empowerment' },
 ]
 
-const countries = ['all', ...Array.from(new Set(opportunitySeed.map((item) => item.country)))]
 const workModes: Array<'all' | WorkMode> = ['all', 'remote', 'onsite', 'hybrid']
 const educationLevels: Array<'all' | EducationLevel> = ['all', 'secondary', 'diploma', 'bachelor', 'masters', 'phd']
 const fundingTypes: Array<'all' | FundingType> = ['all', 'fully-funded', 'partial', 'paid', 'unpaid']
@@ -28,6 +28,8 @@ export function BrowsePage() {
   const navigate = useNavigate()
   const defaultCategory = slug as Category | undefined
   const searchQuery = (new URLSearchParams(location.search).get('search') ?? '').trim()
+  const { opportunities, error: opportunitiesError, loading: opportunitiesLoading } = usePublishedOpportunities()
+  const countries = ['all', ...Array.from(new Set(opportunities.map((item) => item.country)))]
 
   const [category, setCategory] = useState<Category | 'all'>(defaultCategory ?? 'all')
   const [search, setSearch] = useState(searchQuery)
@@ -45,7 +47,9 @@ export function BrowsePage() {
   })
 
   const filteredOpportunities = useMemo(() => {
-    let list = opportunityByCategory(category)
+    let list = category === 'all'
+      ? [...opportunities]
+      : opportunities.filter((item) => item.category === category)
 
     if (search.trim()) {
       const normalized = search.trim().toLowerCase()
@@ -88,7 +92,7 @@ export function BrowsePage() {
     }
 
     return list
-  }, [category, country, educationLevel, funding, search, sortBy, verifiedOnly, workMode])
+  }, [category, country, educationLevel, funding, opportunities, search, sortBy, verifiedOnly, workMode])
 
   const title = category === 'all' ? 'Browse opportunities' : `${categoryLabels[category]} opportunities`
 
@@ -211,8 +215,12 @@ export function BrowsePage() {
 
       {filteredOpportunities.length === 0 ? (
         <div className="mt-10 rounded-3xl border border-dashed border-[#cbd5ce] bg-white p-12 text-center">
+          {opportunitiesError ? <p role="alert" className="text-sm text-red-700">Could not load opportunities: {opportunitiesError}</p> : null}
+          {!opportunitiesError && opportunitiesLoading ? <p className="text-sm text-[#526172]">Loading opportunities...</p> : null}
+          {!opportunitiesError && !opportunitiesLoading ? <>
           <p className="text-xl font-semibold text-[#172234]">No opportunities match your filters</p>
           <p className="mt-2 text-[#647080]">Try widening the country or funding filters to uncover more opportunities.</p>
+          </> : null}
         </div>
       ) : (
         <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">

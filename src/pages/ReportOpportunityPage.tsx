@@ -2,8 +2,9 @@ import { z } from 'zod'
 import { ShieldAlert, CheckCircle2 } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { opportunitySeed } from '../data/opportunities'
+import { usePublishedOpportunities } from '../lib/opportunities'
 import { usePageMeta } from '../lib/seo'
+import { getSupabaseClient } from '../lib/supabase'
 
 const reportSchema = z.object({
   reason: z.string().min(5, 'Please explain why you are reporting this listing'),
@@ -11,11 +12,10 @@ const reportSchema = z.object({
   details: z.string().trim().min(10, 'Add a few more details so the team can investigate.'),
 })
 
-const storageKey = 'agentflow-opportunity-reports-v1'
-
 export function ReportOpportunityPage() {
   const { slug } = useParams()
-  const opportunity = opportunitySeed.find((item) => item.slug === slug)
+  const { opportunities, error: opportunitiesError, loading: opportunitiesLoading } = usePublishedOpportunities()
+  const opportunity = opportunities.find((item) => item.slug === slug)
 
   usePageMeta({
     title: `Report listing | AGENTFLOW`,
@@ -33,7 +33,7 @@ export function ReportOpportunityPage() {
     if (status) setStatus('')
   }
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     const parsed = reportSchema.safeParse(form)
@@ -43,19 +43,41 @@ export function ReportOpportunityPage() {
       return
     }
 
-    const existing = JSON.parse(localStorage.getItem(storageKey) ?? '[]')
-    const next = [...existing, { ...parsed.data, slug, submittedAt: new Date().toISOString() }]
-    localStorage.setItem(storageKey, JSON.stringify(next))
+    try {
+      const client = getSupabaseClient()
+      const [{ data: { session }, error: sessionError }, { data: listing, error: listingError }] = await Promise.all([
+        client.auth.getSession(),
+        client.from('opportunities').select('id').eq('slug', slug ?? '').maybeSingle(),
+      ])
+      if (sessionError) throw sessionError
+      if (listingError) throw listingError
 
-    setError('')
-    setStatus('Your report has been received and will be reviewed by the moderation team.')
-    setForm({ reason: '', email: '', details: '' })
+      const { error: insertError } = await client.from('reports').insert({
+        opportunity_id: listing?.id ?? null,
+        opportunity_slug: slug ?? null,
+        user_id: session?.user.id ?? null,
+        reason: parsed.data.reason.trim(),
+        details: parsed.data.details.trim(),
+        contact_email: parsed.data.email || null,
+      })
+      if (insertError) throw insertError
+
+      setError('')
+      setStatus('Your report has been received and will be reviewed by the moderation team.')
+      setForm({ reason: '', email: '', details: '' })
+    } catch (cause) {
+      console.error('Unable to submit scam report:', cause)
+      setError(cause instanceof Error ? cause.message : 'Unable to submit this report.')
+      setStatus('')
+    }
   }
 
   if (!opportunity) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-12 text-center">
-        <p className="text-2xl font-bold text-[#172234]">Opportunity not found</p>
+        <p role={opportunitiesError ? 'alert' : undefined} className="text-2xl font-bold text-[#172234]">
+          {opportunitiesLoading ? 'Loading opportunity...' : opportunitiesError ? `Unable to load opportunity: ${opportunitiesError}` : 'Opportunity not found'}
+        </p>
         <Link to="/opportunities" className="mt-5 inline-flex rounded-full bg-indigo-500 px-5 py-3 text-sm font-semibold text-white">Back to browse</Link>
       </div>
     )

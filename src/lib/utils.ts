@@ -23,6 +23,7 @@ export function getCountdownParts(deadline: string) {
 }
 
 export function formatCompactDate(date: string) {
+  if (!date || !Number.isFinite(Date.parse(date))) return 'No deadline listed'
   return new Intl.DateTimeFormat('en-NG', {
     day: 'numeric',
     month: 'short',
@@ -31,6 +32,7 @@ export function formatCompactDate(date: string) {
 }
 
 export function formatDeadline(deadline: string) {
+  if (!deadline || !Number.isFinite(Date.parse(deadline))) return 'No deadline listed'
   const countdown = getCountdownParts(deadline)
 
   if (countdown.expired) return 'Expired'

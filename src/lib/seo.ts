@@ -70,3 +70,22 @@ export function useJsonLd(json: Record<string, unknown>) {
     }
   }, [json])
 }
+
+export function useNoIndex() {
+  useEffect(() => {
+    const existing = document.head.querySelector('meta[name="robots"]') as HTMLMetaElement | null
+    const originalContent = existing?.content
+    const robots = existing ?? document.createElement('meta')
+    robots.name = 'robots'
+    robots.content = 'noindex, nofollow'
+    if (!existing) document.head.appendChild(robots)
+
+    return () => {
+      if (existing) {
+        robots.content = originalContent ?? ''
+      } else {
+        robots.remove()
+      }
+    }
+  }, [])
+}

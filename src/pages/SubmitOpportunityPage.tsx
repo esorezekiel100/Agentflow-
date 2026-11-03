@@ -4,6 +4,7 @@ import { type FormEvent, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { categoryLabels } from '../data/opportunities'
 import { usePageMeta } from '../lib/seo'
+import { getSupabaseClient } from '../lib/supabase'
 import type { Category } from '../types'
 
 const submissionSchema = z.object({
@@ -36,8 +37,6 @@ const initialForm: SubmissionForm = {
   description: '',
 }
 
-const storageKey = 'agentflow-opportunity-submissions-v1'
-
 export function SubmitOpportunityPage() {
   usePageMeta({
     title: 'Submit an opportunity | AGENTFLOW',
@@ -55,7 +54,7 @@ export function SubmitOpportunityPage() {
     if (status) setStatus('')
   }
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     const parsed = submissionSchema.safeParse({
@@ -69,13 +68,34 @@ export function SubmitOpportunityPage() {
       return
     }
 
-    const existing = JSON.parse(localStorage.getItem(storageKey) ?? '[]')
-    const next = [...existing, { ...parsed.data, submittedAt: new Date().toISOString() }]
-    localStorage.setItem(storageKey, JSON.stringify(next))
+    try {
+      const client = getSupabaseClient()
+      const { data: { session }, error: sessionError } = await client.auth.getSession()
+      if (sessionError) throw sessionError
 
-    setForm(initialForm)
-    setError('')
-    setStatus('Opportunity submitted to the moderation queue. We will review it within 24 hours.')
+      const { error: insertError } = await client.from('opportunity_submissions').insert({
+        user_id: session?.user.id ?? null,
+        title: parsed.data.title,
+        organization: parsed.data.organization,
+        category: parsed.data.category,
+        location: parsed.data.location,
+        country: 'Global',
+        deadline: parsed.data.deadline,
+        source_url: parsed.data.sourceUrl || null,
+        description: parsed.data.description,
+        funding_type: 'paid',
+        work_mode: 'remote',
+      })
+      if (insertError) throw insertError
+
+      setForm(initialForm)
+      setError('')
+      setStatus('Opportunity submitted to the moderation queue. We will review it within 24 hours.')
+    } catch (cause) {
+      console.error('Unable to submit opportunity:', cause)
+      setError(cause instanceof Error ? cause.message : 'Unable to submit this opportunity.')
+      setStatus('')
+    }
   }
 
   return (

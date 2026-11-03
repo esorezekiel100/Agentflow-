@@ -1,6 +1,10 @@
 import { Check, Clock3, ExternalLink, MapPin, ShieldCheck, Sparkles, Star, Users } from 'lucide-react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect } from 'react'
+import { useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { categoryLabels, opportunitySeed } from '../data/opportunities'
+import { usePublishedOpportunities } from '../lib/opportunities'
+import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase'
 import { useJsonLd, usePageMeta } from '../lib/seo'
 import { formatCompactDate, formatDeadline } from '../lib/utils'
 
@@ -39,7 +43,145 @@ function getEligibilityStatus(opportunity: (typeof opportunitySeed)[number]) {
 
 export function OpportunityDetailPage() {
   const { slug } = useParams()
-  const opportunity = opportunitySeed.find((item) => item.slug === slug)
+  const { opportunities, error: opportunitiesError, loading: opportunitiesLoading } = usePublishedOpportunities()
+  const opportunity = opportunities.find((item) => item.slug === slug)
+  const opportunityId = opportunity?.id
+  const navigate = useNavigate()
+  const [savedState, setSavedState] = useState<{ id: string; saved: boolean } | null>(null)
+  const [actionMessage, setActionMessage] = useState('')
+  const [actionBusy, setActionBusy] = useState(false)
+  const isSaved = Boolean(savedState && savedState.id === opportunityId && savedState.saved)
+
+  useEffect(() => {
+    if (!opportunityId || !isSupabaseConfigured || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(opportunityId)) return
+    let active = true
+    const recordView = async () => {
+      try {
+        const client = getSupabaseClient()
+        const { data: { session }, error: sessionError } = await client.auth.getSession()
+        if (sessionError) throw sessionError
+        if (!session) return
+        const { error } = await client.from('opportunity_views').insert({
+          opportunity_id: opportunityId,
+          viewer_id: session.user.id,
+        })
+        if (error) throw error
+      } catch (error) {
+        if (active) console.error('Unable to record opportunity view:', error)
+      }
+    }
+    void recordView()
+    return () => { active = false }
+  }, [opportunityId])
+
+  useEffect(() => {
+    if (!opportunityId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(opportunityId)) return
+    let active = true
+    const loadSavedState = async () => {
+      try {
+        const client = getSupabaseClient()
+        const { data: { session }, error: sessionError } = await client.auth.getSession()
+        if (sessionError) throw sessionError
+        if (!session) return
+        const { data, error } = await client.from('saved_opportunities')
+          .select('opportunity_id')
+          .eq('user_id', session.user.id)
+          .eq('opportunity_id', opportunityId)
+          .maybeSingle()
+        if (error) throw error
+        if (active) setSavedState({ id: opportunityId, saved: Boolean(data) })
+      } catch (error) {
+        if (active) console.error('Unable to load saved opportunity state:', error)
+      }
+    }
+    void loadSavedState()
+    return () => { active = false }
+  }, [opportunityId])
+
+  const resolveOpportunityId = async () => {
+    if (!opportunity) throw new Error('Opportunity is unavailable.')
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(opportunity.id)) {
+      return opportunity.id
+    }
+    const { data, error } = await getSupabaseClient().from('opportunities').select('id').eq('slug', opportunity.slug).maybeSingle()
+    if (error) throw error
+    if (!data) throw new Error('This opportunity is not yet available in your account database.')
+    return data.id
+  }
+
+  const toggleSave = async () => {
+    setActionMessage('')
+    setActionBusy(true)
+    try {
+      const client = getSupabaseClient()
+      const { data: { session }, error: sessionError } = await client.auth.getSession()
+      if (sessionError) throw sessionError
+      if (!session) {
+        navigate('/auth')
+        return
+      }
+      const databaseId = await resolveOpportunityId()
+      if (isSaved) {
+        const { error } = await client.from('saved_opportunities')
+          .delete()
+          .eq('user_id', session.user.id)
+          .eq('opportunity_id', databaseId)
+        if (error) throw error
+        setSavedState({ id: databaseId, saved: false })
+        setActionMessage('Removed from saved opportunities.')
+      } else {
+        const { error } = await client.from('saved_opportunities').upsert({
+          user_id: session.user.id,
+          opportunity_id: databaseId,
+        }, { onConflict: 'user_id,opportunity_id' })
+        if (error) throw error
+        setSavedState({ id: databaseId, saved: true })
+        setActionMessage('Opportunity saved.')
+      }
+    } catch (error) {
+      console.error('Unable to save opportunity:', error)
+      setActionMessage(error instanceof Error ? error.message : 'Unable to save this opportunity.')
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  const addToTracker = async () => {
+    setActionMessage('')
+    setActionBusy(true)
+    try {
+      const client = getSupabaseClient()
+      const { data: { session }, error: sessionError } = await client.auth.getSession()
+      if (sessionError) throw sessionError
+      if (!session) {
+        navigate('/auth')
+        return
+      }
+      const databaseId = await resolveOpportunityId()
+      const { data: existing, error: lookupError } = await client.from('applications')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .eq('opportunity_id', databaseId)
+        .limit(1)
+      if (lookupError) throw lookupError
+      if (existing.length) {
+        setActionMessage('This opportunity is already in your application tracker.')
+        return
+      }
+      const { error } = await client.from('applications').insert({
+        user_id: session.user.id,
+        opportunity_id: databaseId,
+        stage: 'saved',
+      })
+      if (error) throw error
+      setActionMessage('Opportunity added to your application tracker.')
+    } catch (error) {
+      console.error('Unable to add opportunity to tracker:', error)
+      setActionMessage(error instanceof Error ? error.message : 'Unable to add this opportunity to your tracker.')
+    } finally {
+      setActionBusy(false)
+    }
+  }
 
   usePageMeta({
     title: opportunity ? `${opportunity.title} | AGENTFLOW` : 'Opportunity not found | AGENTFLOW',
@@ -56,8 +198,8 @@ export function OpportunityDetailPage() {
       '@type': 'Organization',
       name: opportunity?.organization ?? '',
     },
-    datePosted: opportunity?.createdAt ?? new Date().toISOString(),
-    validThrough: opportunity?.deadline ?? new Date().toISOString(),
+    datePosted: opportunity?.createdAt,
+    validThrough: opportunity?.deadline || undefined,
     employmentType: opportunity?.workMode ?? 'remote',
     jobLocation: {
       '@type': 'Place',
@@ -72,7 +214,9 @@ export function OpportunityDetailPage() {
   if (!opportunity) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 text-center sm:px-6 lg:px-8">
-        <p className="text-2xl font-bold text-[#172234]">Opportunity not found</p>
+        <p role={opportunitiesError ? 'alert' : undefined} className="text-2xl font-bold text-[#172234]">
+          {opportunitiesLoading ? 'Loading opportunity...' : opportunitiesError ? `Unable to load opportunity: ${opportunitiesError}` : 'Opportunity not found'}
+        </p>
         <Link to="/opportunities" className="mt-4 inline-flex rounded-full bg-indigo-500 px-5 py-3 text-sm font-semibold text-white">Back to browse</Link>
       </div>
     )
@@ -115,11 +259,12 @@ export function OpportunityDetailPage() {
             <p className="mt-6 text-base leading-7 text-slate-300">{opportunity.description}</p>
 
             <div className="mt-6 flex flex-wrap gap-3">
-              <button type="button" className="rounded-full bg-indigo-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400">Save</button>
-              <button type="button" className="rounded-full border border-white/10 bg-slate-950 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-indigo-400/40">Add to tracker</button>
+              <button type="button" disabled={actionBusy} onClick={() => void toggleSave()} className="rounded-full bg-indigo-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:opacity-60">{isSaved ? 'Saved' : 'Save'}</button>
+              <button type="button" disabled={actionBusy} onClick={() => void addToTracker()} className="rounded-full border border-white/10 bg-slate-950 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-indigo-400/40 disabled:opacity-60">Add to tracker</button>
               <button type="button" className="rounded-full border border-white/10 bg-slate-950 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-indigo-400/40">Set reminder</button>
               <Link to={`/report/${opportunity.slug}`} className="rounded-full border border-red-500/30 bg-red-500/10 px-5 py-3 text-sm font-semibold text-red-100 transition hover:bg-red-500/20">Report this listing</Link>
             </div>
+            {actionMessage ? <p role="status" className="mt-3 text-sm text-slate-300">{actionMessage}</p> : null}
 
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
               <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
@@ -209,7 +354,7 @@ export function OpportunityDetailPage() {
               <h2 className="text-xl font-bold">Related opportunities</h2>
             </div>
             <div className="mt-4 space-y-3">
-              {opportunitySeed.filter((item) => item.category === opportunity.category && item.id !== opportunity.id).slice(0, 3).map((item) => (
+              {opportunities.filter((item) => item.category === opportunity.category && item.id !== opportunity.id).slice(0, 3).map((item) => (
                 <Link key={item.id} to={`/opportunity/${item.slug}`} className="block rounded-2xl border border-white/10 bg-slate-950/60 p-3 transition hover:border-indigo-400/40">
                   <p className="text-sm font-semibold text-white">{item.title}</p>
                   <p className="mt-1 text-xs text-slate-400">{item.organization}</p>
