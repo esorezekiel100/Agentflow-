@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="brandBg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="50%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#34d399"/>
+    </linearGradient>
+    <linearGradient id="brandStroke" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#dbeafe"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="18" fill="url(#brandBg)"/>
+  <path d="M18 46 31 17 44 46" fill="none" stroke="url(#brandStroke)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M22.5 32h17" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M38 18c8 1 13.5 6 15.5 13.5 2 7-1 13.5-8.5 15.5M45 18h8.5l-2 8" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
